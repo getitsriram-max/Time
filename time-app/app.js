@@ -44,6 +44,18 @@
   const weekFill8hBtn = $("#week-fill-8h");
   const weekClearBtn = $("#week-clear");
 
+  // File save controls
+  const fileSaveEnabledEl = document.querySelector("#file-save-enabled");
+  const chooseFileBtn = document.querySelector("#choose-file");
+  const fileSaveStatusEl = document.querySelector("#file-save-status");
+
+  /** @type {FileSystemFileHandle|null} */
+  let fileHandle = null;
+
+  // Mongo save controls
+  const mongoSaveEnabledEl = document.querySelector("#mongo-save-enabled");
+  const mongoSaveStatusEl = document.querySelector("#mongo-save-status");
+
   let entries = loadEntries();
 
   function loadEntries() {
@@ -61,6 +73,133 @@
 
   function saveEntries() {
     localStorage.setItem(storageKey, JSON.stringify(entries));
+  }
+
+  function supportsFileSystemAccess() {
+    return typeof window !== "undefined" && "showSaveFilePicker" in window;
+  }
+
+  function setFileStatus(message, isError = false) {
+    if (!fileSaveStatusEl) return;
+    fileSaveStatusEl.textContent = message || "";
+    fileSaveStatusEl.style.color = isError ? "var(--danger)" : "var(--muted)";
+  }
+
+  async function verifyPermission(handle, withWrite) {
+    if (!handle) return false;
+    const opts = withWrite ? { mode: "readwrite" } : {};
+    if (await handle.queryPermission(opts) === "granted") return true;
+    if (await handle.requestPermission(opts) === "granted") return true;
+    return false;
+  }
+
+  async function pickAndPrepareFile() {
+    try {
+      if (!supportsFileSystemAccess()) {
+        setFileStatus("File saving unsupported; will download on save.");
+        return null;
+      }
+      const fh = await window.showSaveFilePicker({
+        suggestedName: "time-entries.json",
+        types: [
+          {
+            description: "JSON Files",
+            accept: { "application/json": [".json"] },
+          },
+        ],
+      });
+      const ok = await verifyPermission(fh, true);
+      if (!ok) {
+        setFileStatus("No permission to write to file.", true);
+        return null;
+      }
+      fileHandle = fh;
+      setFileStatus(`Ready: ${fh.name}`);
+      await writeEntriesToFile();
+      return fh;
+    } catch (err) {
+      // User might have cancelled; keep quiet unless it's a real error
+      console.error("choose file failed", err);
+      setFileStatus("File not selected.");
+      return null;
+    }
+  }
+
+  async function writeEntriesToFile() {
+    if (!supportsFileSystemAccess() || !fileHandle) return;
+    const text = JSON.stringify(entries, null, 2) + "\n";
+    const writable = await fileHandle.createWritable();
+    await writable.write(text);
+    await writable.close();
+  }
+
+  function downloadEntriesJson() {
+    const text = JSON.stringify(entries, null, 2) + "\n";
+    const blob = new Blob([text], { type: "application/json;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `time-entries-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function maybeWriteFile() {
+    try {
+      if (!fileSaveEnabledEl || !fileSaveEnabledEl.checked) return;
+      if (supportsFileSystemAccess() && fileHandle) {
+        const ok = await verifyPermission(fileHandle, true);
+        if (!ok) {
+          setFileStatus("Permission lost; reselect file.", true);
+          return;
+        }
+        await writeEntriesToFile();
+        setFileStatus(`Saved ${entries.length} entr${entries.length === 1 ? "y" : "ies"} to ${fileHandle.name}`);
+      } else if (supportsFileSystemAccess() && !fileHandle) {
+        // Prompt user to pick a file
+        await pickAndPrepareFile();
+      } else {
+        // Fallback: download a JSON snapshot
+        downloadEntriesJson();
+        setFileStatus("Downloaded JSON snapshot (no persistent access)");
+      }
+    } catch (err) {
+      console.error("Failed to save to file", err);
+      setFileStatus("Failed to save to file", true);
+    }
+  }
+
+  function setMongoStatus(message, isError = false) {
+    if (!mongoSaveStatusEl) return;
+    mongoSaveStatusEl.textContent = message || "";
+    mongoSaveStatusEl.style.color = isError ? "var(--danger)" : "var(--muted)";
+  }
+
+  async function maybeSaveToMongo() {
+    try {
+      if (!mongoSaveEnabledEl || !mongoSaveEnabledEl.checked) return;
+      const response = await fetch("/api/snapshots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries }),
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        setMongoStatus(`Mongo save failed: ${text || response.status}`, true);
+        return;
+      }
+      const data = await response.json();
+      if (data && data.ok) {
+        setMongoStatus(`Saved ${entries.length} entr${entries.length === 1 ? "y" : "ies"} (id ${data.id})`);
+      } else {
+        setMongoStatus("Mongo save failed", true);
+      }
+    } catch (err) {
+      console.error("Failed to save to MongoDB", err);
+      setMongoStatus("Mongo save failed (server unreachable?)", true);
+    }
   }
 
   function formatHours(h) {
@@ -158,6 +297,9 @@
     }
 
     saveEntries();
+    // Also save to file or Mongo if enabled
+    Promise.resolve().then(maybeWriteFile);
+    Promise.resolve().then(maybeSaveToMongo);
     render();
     resetForm();
   });
@@ -226,6 +368,8 @@
       if (!confirm("Delete this entry?")) return;
       entries = entries.filter((x) => x.id !== id);
       saveEntries();
+      Promise.resolve().then(maybeWriteFile);
+      Promise.resolve().then(maybeSaveToMongo);
       render();
       return;
     }
@@ -260,6 +404,8 @@
     if (!confirm("This will remove all entries. Continue?")) return;
     entries = [];
     saveEntries();
+    Promise.resolve().then(maybeWriteFile);
+    Promise.resolve().then(maybeSaveToMongo);
     render();
   });
 
@@ -483,8 +629,37 @@
       }
 
       saveEntries();
+      Promise.resolve().then(maybeWriteFile);
+      Promise.resolve().then(maybeSaveToMongo);
       render();
       renderWeekTable();
     });
+  }
+
+  // Wire up file save UI
+  if (chooseFileBtn) {
+    chooseFileBtn.addEventListener("click", () => {
+      pickAndPrepareFile();
+    });
+  }
+
+  if (fileSaveEnabledEl) {
+    fileSaveEnabledEl.addEventListener("change", async (ev) => {
+      if (fileSaveEnabledEl.checked) {
+        if (supportsFileSystemAccess() && !fileHandle) {
+          await pickAndPrepareFile();
+        } else if (!supportsFileSystemAccess()) {
+          setFileStatus("Will download JSON on save (no persistent access)");
+        }
+      } else {
+        setFileStatus("");
+      }
+    });
+  }
+
+  // Initialize UI state
+  if (chooseFileBtn && !supportsFileSystemAccess()) {
+    chooseFileBtn.disabled = true;
+    setFileStatus("File saving unsupported; will download JSON on save.");
   }
 })();
