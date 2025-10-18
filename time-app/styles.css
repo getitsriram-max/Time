@@ -39,10 +39,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .toolbar { display: flex; gap: 16px; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; }
 .filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 .tools { display: flex; gap: 12px; }
-.
+
 .file-tools { display: inline-flex; gap: 10px; align-items: center; margin-left: 10px; }
 .file-toggle { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-weight: 600; }
 .muted { color: var(--muted); font-size: 12px; }
+
+.mongo-tools { display: inline-flex; gap: 10px; align-items: center; margin-left: 10px; }
+.mongo-toggle { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-weight: 600; }
 
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }

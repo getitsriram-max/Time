@@ -52,6 +52,10 @@
   /** @type {FileSystemFileHandle|null} */
   let fileHandle = null;
 
+  // Mongo save controls
+  const mongoSaveEnabledEl = document.querySelector("#mongo-save-enabled");
+  const mongoSaveStatusEl = document.querySelector("#mongo-save-status");
+
   let entries = loadEntries();
 
   function loadEntries() {
@@ -167,6 +171,37 @@
     }
   }
 
+  function setMongoStatus(message, isError = false) {
+    if (!mongoSaveStatusEl) return;
+    mongoSaveStatusEl.textContent = message || "";
+    mongoSaveStatusEl.style.color = isError ? "var(--danger)" : "var(--muted)";
+  }
+
+  async function maybeSaveToMongo() {
+    try {
+      if (!mongoSaveEnabledEl || !mongoSaveEnabledEl.checked) return;
+      const response = await fetch("/api/snapshots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries }),
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        setMongoStatus(`Mongo save failed: ${text || response.status}`, true);
+        return;
+      }
+      const data = await response.json();
+      if (data && data.ok) {
+        setMongoStatus(`Saved ${entries.length} entr${entries.length === 1 ? "y" : "ies"} (id ${data.id})`);
+      } else {
+        setMongoStatus("Mongo save failed", true);
+      }
+    } catch (err) {
+      console.error("Failed to save to MongoDB", err);
+      setMongoStatus("Mongo save failed (server unreachable?)", true);
+    }
+  }
+
   function formatHours(h) {
     return `${h.toFixed(2)} h`;
   }
@@ -262,8 +297,9 @@
     }
 
     saveEntries();
-    // Also save to file if enabled
+    // Also save to file or Mongo if enabled
     Promise.resolve().then(maybeWriteFile);
+    Promise.resolve().then(maybeSaveToMongo);
     render();
     resetForm();
   });
@@ -333,6 +369,7 @@
       entries = entries.filter((x) => x.id !== id);
       saveEntries();
       Promise.resolve().then(maybeWriteFile);
+      Promise.resolve().then(maybeSaveToMongo);
       render();
       return;
     }
@@ -368,6 +405,7 @@
     entries = [];
     saveEntries();
     Promise.resolve().then(maybeWriteFile);
+    Promise.resolve().then(maybeSaveToMongo);
     render();
   });
 
@@ -592,6 +630,7 @@
 
       saveEntries();
       Promise.resolve().then(maybeWriteFile);
+      Promise.resolve().then(maybeSaveToMongo);
       render();
       renderWeekTable();
     });
