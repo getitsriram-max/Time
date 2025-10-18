@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Time Entry</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Time Entry</h1>
+  </header>
+
+  <main>
+    <section class="card">
+      <form id="entry-form">
+        <div class="row">
+          <label>
+            Date
+            <input type="date" id="date" required />
+          </label>
+          <label>
+            Project
+            <input type="text" id="project" placeholder="Project name" required />
+          </label>
+          <label>
+            Task
+            <input type="text" id="task" placeholder="Task description" required />
+          </label>
+        </div>
+        <div class="row">
+          <label>
+            Start
+            <input type="time" id="start" required />
+          </label>
+          <label>
+            End
+            <input type="time" id="end" required />
+          </label>
+          <label>
+            Break (min)
+            <input type="number" id="break" min="0" step="5" value="0" />
+          </label>
+          <label>
+            Duration (h)
+            <input type="number" id="duration" min="0" step="0.01" readonly />
+          </label>
+        </div>
+        <div class="row">
+          <label class="grow">
+            Notes
+            <input type="text" id="notes" placeholder="Optional notes" />
+          </label>
+        </div>
+        <div class="actions">
+          <button type="submit" id="save-btn">Save</button>
+          <button type="button" id="reset-btn" class="secondary">Reset</button>
+        </div>
+        <input type="hidden" id="edit-id" />
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="toolbar">
+        <div class="filters">
+          <label>
+            From
+            <input type="date" id="filter-from" />
+          </label>
+          <label>
+            To
+            <input type="date" id="filter-to" />
+          </label>
+          <label>
+            Project
+            <input type="text" id="filter-project" placeholder="Filter by project" />
+          </label>
+          <button type="button" id="apply-filters" class="secondary">Apply</button>
+          <button type="button" id="clear-filters" class="link">Clear</button>
+        </div>
+        <div class="tools">
+          <button type="button" id="export-csv" class="secondary">Export CSV</button>
+          <button type="button" id="clear-all" class="danger">Clear All</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="entries-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Project</th>
+              <th>Task</th>
+              <th>Start</th>
+              <th>End</th>
+              <th>Break</th>
+              <th>Duration</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="6" class="right">Total</td>
+              <td id="total-hours">0.00 h</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <small>Local-only demo. Data saved in your browser.</small>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
