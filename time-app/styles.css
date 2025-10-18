@@ -52,3 +52,10 @@ tr:hover td { background: #0d1430; }
 
 .action-btns { display: flex; gap: 8px; }
 .action-btns button { padding: 6px 10px; font-weight: 600; }
+
+/* Weekly section */
+#weekly-section h2 { margin: 8px 4px 14px; font-size: 18px; }
+.week-toolbar { display: flex; gap: 12px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px; }
+.week-nav { display: flex; gap: 8px; }
+#week-table td:nth-child(1) { color: var(--muted); width: 140px; }
+#week-table input[type="number"], #week-table input[type="text"] { width: 100%; }

@@ -32,6 +32,18 @@
   const clearAllBtn = $("#clear-all");
   const resetBtn = $("#reset-btn");
 
+  // Weekly timesheet elements
+  const weekPickerEl = $("#week-picker");
+  const weekPrevBtn = $("#week-prev");
+  const weekNextBtn = $("#week-next");
+  const weekProjectEl = $("#week-project");
+  const weekTaskEl = $("#week-task");
+  const weekNotesEl = $("#week-notes");
+  const weekTbody = $("#week-tbody");
+  const weekSaveBtn = $("#week-save");
+  const weekFill8hBtn = $("#week-fill-8h");
+  const weekClearBtn = $("#week-clear");
+
   let entries = loadEntries();
 
   function loadEntries() {
@@ -283,4 +295,196 @@
   }
 
   render();
+
+  // ========== Weekly timesheet ==========
+  const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  function pad2(n) { return String(n).padStart(2, "0"); }
+
+  function ymd(date) {
+    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  }
+
+  function getMondayFromDate(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const day = d.getDay() || 7; // Sun=0 -> 7
+    d.setDate(d.getDate() - day + 1);
+    return d;
+  }
+
+  function dateToIsoWeek(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const day = d.getDay() || 7; // Thu-based week numbering
+    d.setDate(d.getDate() + 4 - day);
+    const isoYear = d.getFullYear();
+    const yearStart = new Date(isoYear, 0, 1);
+    const week = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+    return { year: isoYear, week };
+  }
+
+  function getMondayOfIsoWeek(week, year) {
+    const jan4 = new Date(year, 0, 4);
+    const day = jan4.getDay() || 7;
+    const mondayW1 = new Date(jan4);
+    mondayW1.setDate(jan4.getDate() - day + 1);
+    const monday = new Date(mondayW1);
+    monday.setDate(mondayW1.getDate() + (week - 1) * 7);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  }
+
+  function setWeekPickerToDate(date) {
+    if (!weekPickerEl) return;
+    const { year, week } = dateToIsoWeek(date);
+    weekPickerEl.value = `${year}-W${String(week).padStart(2, "0")}`;
+  }
+
+  function parseWeekPickerValue(value) {
+    if (!value) return null;
+    const m = /^(\d{4})-W(\d{2})$/.exec(value);
+    if (!m) return null;
+    const year = parseInt(m[1], 10);
+    const week = parseInt(m[2], 10);
+    return getMondayOfIsoWeek(week, year);
+  }
+
+  function renderWeekTable() {
+    if (!weekTbody || !weekPickerEl) return;
+    const monday = parseWeekPickerValue(weekPickerEl.value) || getMondayFromDate(new Date());
+    const project = (weekProjectEl && weekProjectEl.value || "").trim();
+    const task = (weekTaskEl && weekTaskEl.value || "").trim();
+
+    weekTbody.innerHTML = "";
+    for (let i = 0; i < 7; i++) {
+      const dayDate = new Date(monday);
+      dayDate.setDate(monday.getDate() + i);
+      const dateStr = ymd(dayDate);
+      let hoursValue = "";
+      let dayNotes = "";
+      if (project && task) {
+        const existing = entries.find((e) => e.date === dateStr && e.project === project && e.task === task && !e.start && !e.end);
+        if (existing) {
+          hoursValue = (existing.durationHours || 0).toFixed(2);
+          dayNotes = existing.notes || "";
+        }
+      }
+      const tr = document.createElement("tr");
+      tr.setAttribute("data-date", dateStr);
+      tr.innerHTML = `
+        <td>${DAY_LABELS[i]}</td>
+        <td>${dateStr}</td>
+        <td>
+          <input type=\"number\" class=\"hours-input\" min=\"0\" step=\"0.25\" inputmode=\"decimal\" data-date=\"${dateStr}\" value=\"${hoursValue}\" placeholder=\"0\" />
+        </td>
+        <td>
+          <input type=\"text\" class=\"note-input\" data-date=\"${dateStr}\" value=\"${escapeHtml(dayNotes)}\" placeholder=\"Optional\" />
+        </td>`;
+      weekTbody.appendChild(tr);
+    }
+  }
+
+  if (weekPickerEl) {
+    setWeekPickerToDate(new Date());
+    renderWeekTable();
+
+    weekPickerEl.addEventListener("input", renderWeekTable);
+    weekPrevBtn && weekPrevBtn.addEventListener("click", () => {
+      const monday = parseWeekPickerValue(weekPickerEl.value) || getMondayFromDate(new Date());
+      const prev = new Date(monday);
+      prev.setDate(monday.getDate() - 7);
+      setWeekPickerToDate(prev);
+      renderWeekTable();
+    });
+    weekNextBtn && weekNextBtn.addEventListener("click", () => {
+      const monday = parseWeekPickerValue(weekPickerEl.value) || getMondayFromDate(new Date());
+      const next = new Date(monday);
+      next.setDate(monday.getDate() + 7);
+      setWeekPickerToDate(next);
+      renderWeekTable();
+    });
+
+    weekProjectEl && weekProjectEl.addEventListener("input", renderWeekTable);
+    weekTaskEl && weekTaskEl.addEventListener("input", renderWeekTable);
+
+    weekFill8hBtn && weekFill8hBtn.addEventListener("click", () => {
+      if (!weekTbody) return;
+      const rows = Array.from(weekTbody.querySelectorAll("tr"));
+      rows.forEach((tr, idx) => {
+        const hoursInput = tr.querySelector("input.hours-input");
+        if (!hoursInput) return;
+        hoursInput.value = idx < 5 ? "8" : "0"; // 8h Mon-Fri
+      });
+    });
+
+    weekClearBtn && weekClearBtn.addEventListener("click", () => {
+      if (!weekTbody) return;
+      const hoursInputs = weekTbody.querySelectorAll("input.hours-input");
+      const noteInputs = weekTbody.querySelectorAll("input.note-input");
+      hoursInputs.forEach((el) => (el.value = ""));
+      noteInputs.forEach((el) => (el.value = ""));
+    });
+
+    weekSaveBtn && weekSaveBtn.addEventListener("click", () => {
+      const project = (weekProjectEl && weekProjectEl.value || "").trim();
+      const task = (weekTaskEl && weekTaskEl.value || "").trim();
+      const notesAll = (weekNotesEl && weekNotesEl.value || "").trim();
+      if (!project || !task) {
+        alert("Please provide Project and Task for the week.");
+        return;
+      }
+      if (!weekTbody) return;
+
+      const rows = Array.from(weekTbody.querySelectorAll("tr"));
+      for (const tr of rows) {
+        const dateStr = tr.getAttribute("data-date");
+        const hoursInput = tr.querySelector("input.hours-input");
+        const noteInput = tr.querySelector("input.note-input");
+        if (!dateStr || !hoursInput || !noteInput) continue;
+        const hours = Number(hoursInput.value || 0);
+        const dayNotes = (noteInput.value || "").trim();
+        const combinedNotes = [dayNotes, notesAll].filter(Boolean).join(" | ");
+
+        if (Number.isNaN(hours) || hours < 0) continue;
+
+        const existingIdx = entries.findIndex(
+          (e) => e.date === dateStr && e.project === project && e.task === task && !e.start && !e.end
+        );
+        if (hours > 0) {
+          if (existingIdx !== -1) {
+            entries[existingIdx] = {
+              ...entries[existingIdx],
+              durationHours: hours,
+              breakMin: 0,
+              start: "",
+              end: "",
+              notes: combinedNotes,
+            };
+          } else {
+            entries.push({
+              id: uid(),
+              date: dateStr,
+              project,
+              task,
+              start: "",
+              end: "",
+              breakMin: 0,
+              durationHours: hours,
+              notes: combinedNotes,
+            });
+          }
+        } else {
+          // hours == 0 -> remove existing weekly-only entry if any
+          if (existingIdx !== -1) {
+            entries.splice(existingIdx, 1);
+          }
+        }
+      }
+
+      saveEntries();
+      render();
+      renderWeekTable();
+    });
+  }
 })();

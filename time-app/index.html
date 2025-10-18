@@ -60,6 +60,54 @@
       </form>
     </section>
 
+    <section class="card" id="weekly-section">
+      <h2>Weekly Timesheet</h2>
+      <div class="week-toolbar">
+        <label>
+          Week
+          <input type="week" id="week-picker" required />
+        </label>
+        <div class="week-nav">
+          <button type="button" id="week-prev" class="secondary">Prev</button>
+          <button type="button" id="week-next" class="secondary">Next</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>
+          Project
+          <input type="text" id="week-project" placeholder="Project name" />
+        </label>
+        <label class="grow">
+          Task
+          <input type="text" id="week-task" placeholder="Task description" />
+        </label>
+        <label class="grow">
+          Notes for all days
+          <input type="text" id="week-notes" placeholder="Optional notes applied to all days" />
+        </label>
+      </div>
+
+      <div class="table-wrap">
+        <table id="week-table">
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Date</th>
+              <th>Hours</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="week-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="actions">
+        <button type="button" id="week-save">Save Week</button>
+        <button type="button" id="week-fill-8h" class="secondary">Fill Weekdays 8h</button>
+        <button type="button" id="week-clear" class="link">Clear</button>
+      </div>
+    </section>
+
     <section class="card">
       <div class="toolbar">
         <div class="filters">
