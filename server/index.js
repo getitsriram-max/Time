@@ -80,13 +80,15 @@ app.use((_req, res, next) => {
   res.sendFile(path.join(staticDir, 'index.html'));
 });
 
-connectMongo()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`[server] listening on http://localhost:${PORT}`);
-    });
-  })
-  .catch((err) => {
-    console.error('[startup] failed to connect to MongoDB', err);
-    process.exit(1);
+// Start server even if MongoDB is unavailable (Mongo-dependent routes will return 503)
+(async () => {
+  try {
+    await connectMongo();
+  } catch (err) {
+    console.warn('[startup] MongoDB not connected; continuing without MongoDB. File/Mongo features will be limited.');
+  }
+
+  app.listen(PORT, () => {
+    console.log(`[server] listening on http://localhost:${PORT}`);
   });
+})();
